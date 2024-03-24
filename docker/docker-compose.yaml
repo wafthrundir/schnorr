@@ -1,0 +1,70 @@
+
+name: ethereum-local
+
+services:
+  init:
+    build: init
+    volumes:
+      - shared-volume:/var/local/shared
+      - ./init/init.sh:/root/init.sh
+    command: /root/init.sh "$PASSWORD" "$NETWORKID"
+
+  bootnode:
+    image: ethereum/client-go:alltools-release-1.12
+    volumes:
+      - shared-volume:/var/local/shared
+      - ./bootnode/bootnode.sh:/root/bootnode.sh
+    command: /root/bootnode.sh
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    networks:
+      node-network:
+        ipv4_address: 172.16.254.100
+
+
+  node1:
+    build: node
+    volumes:
+      - shared-volume:/var/local/shared
+      - ./node/node.sh:/root/node.sh
+    command: /root/node.sh "$NETWORKID" 1 "172.16.254.101"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      bootnode:
+        condition: service_started
+    networks:
+      node-network:
+        ipv4_address: 172.16.254.101
+    ports:
+      - "8545:8545"
+      - "8546:8546"
+
+  node2:
+    build: node
+    volumes:
+      - shared-volume:/var/local/shared
+      - ./node/node.sh:/root/node.sh
+    command: /root/node.sh "$NETWORKID" 2 "172.16.254.102"
+    depends_on:
+      init:
+        condition: service_completed_successfully
+      bootnode:
+        condition: service_started
+      node1:
+        condition: service_started
+    networks:
+      node-network:
+        ipv4_address: 172.16.254.102
+
+
+volumes:
+  shared-volume:
+
+networks:
+  node-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.254.0/24
